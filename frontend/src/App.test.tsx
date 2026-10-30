@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 
 import App from "./App";
@@ -18,6 +18,18 @@ function renderAt(path: string) {
     </QueryClientProvider>,
   );
 }
+
+// jsdom has a real WebSocket; keep the live-updates hook from opening connections in tests.
+class FakeWebSocket {
+  onopen = null;
+  onmessage = null;
+  onclose = null;
+  close() {}
+}
+
+beforeEach(() => {
+  vi.stubGlobal("WebSocket", FakeWebSocket);
+});
 
 afterEach(() => {
   cleanup();

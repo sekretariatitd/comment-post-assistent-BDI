@@ -14,6 +14,10 @@ export interface Draft {
   edited_text: string | null;
   status: DraftStatus;
   model_name: string;
+  reviewer_id: string | null;
+  reviewed_at: string | null;
+  published_at: string | null;
+  error: string | null;
   created_at: string;
 }
 
@@ -43,6 +47,7 @@ export interface PostPage {
 export interface PostFilters {
   status?: PostStatus;
   source_id?: string;
+  review?: DraftStatus;
   offset?: number;
 }
 

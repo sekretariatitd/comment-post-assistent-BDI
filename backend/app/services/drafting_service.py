@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.client import LLMClient, LLMError
 from app.models import Draft, DraftStatus, Post, PostStatus, PromptTemplate, Source, User
-from app.services import audit_service, template_service
+from app.services import audit_service, events, template_service
 from app.services.errors import InvalidInputError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -170,6 +170,8 @@ async def draft_comments(
         )
     post.status = PostStatus.drafted
     await db.commit()
+    for draft in drafts:
+        await events.publish("draft.created", draft_id=draft.id, post_id=post.id)
     return drafts
 
 

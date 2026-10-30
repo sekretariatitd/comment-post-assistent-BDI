@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.sources import FetchedPost, FetchError, SourceAdapter, pollable_keys
 from app.models import Post, Source
-from app.services import audit_service
+from app.services import audit_service, events
 
 logger = logging.getLogger(__name__)
 
@@ -97,4 +97,6 @@ async def poll_source(db: AsyncSession, source: Source, adapter: SourceAdapter) 
             payload={"fetched": len(fetched), "new_posts": len(new_ids)},
         )
     await db.commit()
+    for post_id in new_ids:
+        await events.publish("post.created", post_id=post_id, source_id=source.id)
     return new_ids

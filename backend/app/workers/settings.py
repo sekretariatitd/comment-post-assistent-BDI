@@ -5,7 +5,13 @@ from arq import cron, func
 from arq.connections import RedisSettings
 
 from app.core.config import get_settings
-from app.workers.jobs import draft_comments, enqueue_due_sources, poll_source, score_post
+from app.workers.jobs import (
+    draft_comments,
+    enqueue_due_sources,
+    poll_source,
+    publish_draft,
+    score_post,
+)
 
 # ARQ logs its own job lines; give our "app.*" loggers a handler without duplicating those.
 _app_logger = logging.getLogger("app")
@@ -22,6 +28,7 @@ class WorkerSettings:
         func(poll_source, keep_result=0, timeout=120),
         func(score_post, keep_result=0, timeout=300),
         func(draft_comments, keep_result=0, timeout=300),
+        func(publish_draft, keep_result=0, timeout=120),
     ]
     # LLM calls are slow I/O; run a few in parallel.
     max_jobs = 5

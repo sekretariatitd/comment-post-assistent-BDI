@@ -1,30 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 
-import {
-  PAGE_SIZE,
-  useAddPost,
-  useImportPosts,
-  usePosts,
-  useRegenerate,
-  type Post,
-  type PostStatus,
-} from "../api/posts";
-import { PLATFORMS, useSources, type Source } from "../api/sources";
-import { useTemplates, type Template } from "../api/templates";
-import {
-  Badge,
-  Button,
-  ErrorText,
-  Field,
-  Modal,
-  Select,
-  TextArea,
-  TextInput,
-} from "../components/ui";
-import { formatDate } from "../lib/format";
-
-const STATUS_TONE = { new: "slate", skipped: "amber", drafted: "green" } as const;
+import { PAGE_SIZE, useAddPost, useImportPosts, usePosts, type PostStatus } from "../api/posts";
+import { useSources, type Source } from "../api/sources";
+import { useTemplates } from "../api/templates";
+import { PostCard } from "../components/PostCard";
+import { Button, ErrorText, Field, Modal, Select, TextArea, TextInput } from "../components/ui";
 
 export default function Posts() {
   const [params, setParams] = useSearchParams();
@@ -59,7 +40,7 @@ export default function Posts() {
         <div>
           <h1 className="text-xl font-semibold">Posts</h1>
           <p className="text-sm text-slate-500">
-            Fetched from your sources, or added by hand. Refreshes every 30 seconds.
+            Everything fetched from your sources or added by hand. Updates live.
           </p>
         </div>
         <div className="flex items-end gap-2">
@@ -148,129 +129,6 @@ export default function Posts() {
         />
       )}
     </div>
-  );
-}
-
-function PostCard({
-  post,
-  source,
-  templates,
-}: {
-  post: Post;
-  source?: Source;
-  templates: Template[];
-}) {
-  const [title, ...rest] = post.text.split("\n\n");
-  const regenerate = useRegenerate();
-  const [templateId, setTemplateId] = useState(
-    source?.prompt_template_id ?? templates.find((t) => t.is_active)?.id ?? "",
-  );
-  const scoring = post.status === "new" && post.relevance_score === null && !post.relevance_reason;
-  const drafting = regenerate.isPending;
-
-  return (
-    <li className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex gap-4">
-        {post.thumbnail_url && (
-          <img
-            src={post.thumbnail_url}
-            alt=""
-            loading="lazy"
-            className="h-20 w-28 shrink-0 rounded-md bg-slate-100 object-cover"
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="font-medium text-slate-700">
-              {source?.display_name ?? "Unknown source"}
-            </span>
-            {source && <span>{PLATFORMS.find((x) => x.value === source.platform)?.label}</span>}
-            <span>·</span>
-            <span title="Published">{formatDate(post.published_at ?? post.fetched_at)}</span>
-            <Badge tone={STATUS_TONE[post.status]}>{post.status}</Badge>
-            {post.relevance_score !== null && <span>score {post.relevance_score.toFixed(2)}</span>}
-            {scoring && <span className="animate-pulse text-indigo-600">scoring…</span>}
-          </div>
-          <a
-            href={post.url}
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium text-slate-900 hover:text-indigo-700 hover:underline"
-          >
-            {title}
-          </a>
-          {rest.length > 0 && (
-            <p className="mt-1 line-clamp-2 text-sm text-slate-600">{rest.join(" ")}</p>
-          )}
-          {post.relevance_reason && (
-            <p className="mt-2 text-xs text-slate-500">Why: {post.relevance_reason}</p>
-          )}
-        </div>
-      </div>
-
-      {post.drafts.length > 0 && (
-        <ol className="mt-4 space-y-2">
-          {post.drafts.map((d, i) => (
-            <DraftItem key={d.id} index={i + 1} text={d.edited_text ?? d.text} />
-          ))}
-        </ol>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-        <div className="w-44">
-          <Select
-            aria-label="Template"
-            value={templateId}
-            onChange={(e) => setTemplateId(e.target.value)}
-          >
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <Button
-          variant={post.drafts.length ? "secondary" : "primary"}
-          disabled={!templateId || drafting}
-          onClick={() => regenerate.mutate({ postId: post.id, templateId })}
-        >
-          {drafting ? "Drafting…" : post.drafts.length ? "Redraft" : "Draft comments"}
-        </Button>
-        <a
-          href={post.url}
-          target="_blank"
-          rel="noreferrer"
-          className="ml-auto rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-        >
-          Open post ↗
-        </a>
-        <div className="w-full">
-          <ErrorText error={regenerate.error} />
-        </div>
-      </div>
-    </li>
-  );
-}
-
-function DraftItem({ index, text }: { index: number; text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <li className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-      <span className="mt-0.5 text-xs font-medium text-slate-400">{index}</span>
-      <p className="flex-1 whitespace-pre-wrap text-slate-800">{text}</p>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <Button onClick={copy}>{copied ? "Copied ✓" : "Copy"}</Button>
-        <span className="text-xs text-slate-400">{text.length} chars</span>
-      </div>
-    </li>
   );
 }
 

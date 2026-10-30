@@ -1,14 +1,14 @@
 import uuid
 from urllib.parse import urlsplit, urlunsplit
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.sources import FetchedPost, facebook_payload, tiktok_payload
 from app.adapters.sources.browser_payload import PayloadError
-from app.models import Platform, Post, PostStatus, User
+from app.models import Draft, DraftStatus, Platform, Post, PostStatus, User
 from app.schemas.post import ManualPostCreate
-from app.services import audit_service, ingest_service, source_service
+from app.services import audit_service, events, ingest_service, source_service
 from app.services.errors import ConflictError, InvalidInputError, NotFoundError
 
 
@@ -18,10 +18,14 @@ async def list_posts(
     status: PostStatus | None = None,
     source_id: uuid.UUID | None = None,
     min_score: float | None = None,
+    draft_status: DraftStatus | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Post], int]:
+    """`draft_status` keeps posts that have at least one draft in that state (review queue)."""
     filters = []
+    if draft_status is not None:
+        filters.append(exists().where(Draft.post_id == Post.id, Draft.status == draft_status))
     if status is not None:
         filters.append(Post.status == status)
     if source_id is not None:
@@ -81,6 +85,7 @@ async def add_manual_post(db: AsyncSession, actor: User, body: ManualPostCreate)
         payload={"source_id": str(source.id), "url": url},
     )
     await db.commit()
+    await events.publish("post.created", post_id=new_ids[0], source_id=source.id)
     return await get_post(db, new_ids[0])
 
 
@@ -110,4 +115,6 @@ async def import_payload(
         payload={"found": len(posts), "new_posts": len(new_ids)},
     )
     await db.commit()
+    for post_id in new_ids:
+        await events.publish("post.created", post_id=post_id, source_id=source.id)
     return len(posts), new_ids

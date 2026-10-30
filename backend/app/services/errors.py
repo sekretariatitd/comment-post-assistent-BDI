@@ -15,3 +15,7 @@ class ConflictError(ServiceError):
 
 class InvalidInputError(ServiceError):
     status_code = 422
+
+
+class RateLimitedError(ServiceError):
+    status_code = 429

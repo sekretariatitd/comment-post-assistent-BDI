@@ -1,15 +1,17 @@
-"""ARQ jobs. publish_draft arrives in Phase 6."""
+"""ARQ background jobs: polling, scoring, drafting and publishing."""
 
 import logging
 import uuid
 from typing import Any
 
+from app.adapters.publishers import get_publisher
 from app.adapters.sources import get_adapter
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.llm.client import LLMError, get_llm_client
 from app.models import Source
-from app.services import audit_service, drafting_service, ingest_service
+from app.services import audit_service, drafting_service, ingest_service, review_service
+from app.services.errors import ServiceError
 from app.workers.queue import enqueue_scoring, poll_job_id
 
 logger = logging.getLogger(__name__)
@@ -74,3 +76,15 @@ async def draft_comments(ctx: dict[str, Any], post_id: str) -> int:
             await db.commit()
             return 0
     return len(drafts)
+
+
+async def publish_draft(ctx: dict[str, Any], draft_id: str) -> str:
+    """Publish an approved draft with the configured publisher (automated only when
+    ENABLE_AUTOMATED_PUBLISHING is on). review_service refuses anything not approved."""
+    async with SessionLocal() as db:
+        try:
+            draft = await review_service.publish(db, uuid.UUID(draft_id), get_publisher())
+        except ServiceError as e:
+            logger.warning("Publishing draft %s refused: %s", draft_id, e)
+            return f"refused: {e}"
+    return draft.status.value

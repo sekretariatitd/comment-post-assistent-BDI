@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.llm.client import LLMClient, get_llm_client
-from app.models import Post, PostStatus, User
+from app.models import DraftStatus, Post, PostStatus, User
 from app.schemas.draft import DraftOut, RegenerateRequest
 from app.schemas.post import ImportResult, ManualPostCreate, PayloadImport, PostOut, PostPage
 from app.services import drafting_service, post_service
@@ -31,13 +31,22 @@ async def list_posts(
     status: PostStatus | None = None,
     source_id: uuid.UUID | None = None,
     min_score: float | None = Query(default=None, ge=0, le=1),
+    review: DraftStatus | None = Query(
+        default=None, description="Posts with a draft in this state"
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> PostPage:
     items, total = await post_service.list_posts(
-        db, status=status, source_id=source_id, min_score=min_score, limit=limit, offset=offset
+        db,
+        status=status,
+        source_id=source_id,
+        min_score=min_score,
+        draft_status=review,
+        limit=limit,
+        offset=offset,
     )
     return PostPage(items=await _with_drafts(db, items), total=total, limit=limit, offset=offset)
 
